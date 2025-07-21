@@ -44,12 +44,23 @@ function loadExercises() {
       exercisesData = XLSX.utils.sheet_to_json(worksheet);
       console.log('Method 1 - Direct JSON conversion found', exercisesData.length, 'rows');
       
-      if (exercisesData.length > 0 && exercisesData[0].Exercise) {
+      if (exercisesData.length > 0 && (exercisesData[0].Exercise || exercisesData[0]['Exercise'])) {
         // Success! Headers are in first row
-        exercises = exercisesData.map((row, index) => ({
-          id: index + 1,
-          ...row
-        }));
+        exercises = exercisesData.map((row, index) => {
+          const exercise = { id: index + 1 };
+          
+          // Map the data to expected format
+          Object.keys(row).forEach(key => {
+            if (key === 'Video Link') {
+              exercise['Short YouTube Demonstration'] = row[key] || '';
+              exercise['In-Depth YouTube Explanation'] = row[key] || '';
+            } else {
+              exercise[key] = row[key] || '';
+            }
+          });
+          
+          return exercise;
+        });
         console.log(`Loaded ${exercises.length} exercises using Method 1`);
         return;
       }
@@ -80,6 +91,12 @@ function loadExercises() {
         }
       }
       
+      // If no header found, assume first row is headers (common in Excel files)
+      if (headerRowIndex === -1 && rawData.length > 0) {
+        headerRowIndex = 0;
+        console.log('Using first row as headers:', rawData[0]);
+      }
+      
       if (headerRowIndex === -1) {
         // Try to use first row as headers if it looks like headers
         const firstRow = rawData[0];
@@ -107,7 +124,16 @@ function loadExercises() {
           const exercise = { id: index + 1 };
           headers.forEach((header, i) => {
             if (header && header.toString().trim()) {
-              exercise[header.toString().trim()] = (row[i] || '').toString().trim();
+              const headerName = header.toString().trim();
+              let value = (row[i] || '').toString().trim();
+              
+              // Map your column names to the expected format
+              if (headerName === 'Video Link') {
+                exercise['Short YouTube Demonstration'] = value;
+                exercise['In-Depth YouTube Explanation'] = value; // Use same link for both
+              } else {
+                exercise[headerName] = value;
+              }
             }
           });
           return exercise;
@@ -187,8 +213,36 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
   
+  console.log('File uploaded:', req.file.originalname);
+  console.log('File saved as:', req.file.filename);
+  
   loadExercises();
-  res.json({ message: 'File uploaded and processed successfully', count: exercises.length });
+  res.json({ 
+    message: 'File uploaded and processed successfully', 
+    count: exercises.length,
+    fileName: req.file.originalname,
+    savedAs: req.file.filename
+  });
+});
+
+// Simple file upload for testing (accepts any Excel file)
+app.post('/api/upload-test', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  
+  console.log('Test upload - File:', req.file.originalname);
+  
+  // Try to load exercises immediately
+  loadExercises();
+  
+  res.json({
+    success: true,
+    message: 'File uploaded for testing',
+    fileName: req.file.originalname,
+    exercisesLoaded: exercises.length,
+    sampleExercise: exercises[0] || null
+  });
 });
 
 // Get all exercises with filtering and pagination
@@ -268,24 +322,64 @@ app.get('/api/filters', (req, res) => {
 // Debug endpoint to check Excel parsing
 app.get('/api/debug/excel', (req, res) => {
   try {
-    const workbook = XLSX.readFile('./uploads/exercise-database.xlsx');
+    // Check if file exists
+    const fs = require('fs');
+    const filePath = './uploads/exercise-database.xlsx';
+    
+    if (!fs.existsSync(filePath)) {
+      return res.json({
+        error: 'Excel file not found',
+        message: 'Please upload an Excel file named "exercise-database.xlsx" to the uploads folder',
+        availableFiles: fs.readdirSync('./uploads/').filter(f => f.endsWith('.xlsx') || f.endsWith('.xls') || f.endsWith('.csv'))
+      });
+    }
+    
+    const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
+    // Try multiple parsing methods
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
     
     res.json({
+      fileExists: true,
       sheets: workbook.SheetNames,
       currentSheet: sheetName,
       totalRows: rawData.length,
       firstFewRows: rawData.slice(0, 5),
+      jsonDataSample: jsonData.slice(0, 3),
       exercisesLoaded: exercises.length,
-      sampleExercise: exercises[0] || null
+      sampleExercise: exercises[0] || null,
+      allExercises: exercises.slice(0, 5),
+      parsingMethods: {
+        rawDataLength: rawData.length,
+        jsonDataLength: jsonData.length,
+        hasHeaders: rawData.length > 0 && rawData[0].length > 0
+      }
     });
   } catch (error) {
     res.status(500).json({ 
       error: 'Error reading Excel file', 
-      details: error.message 
+      details: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Test endpoint to manually trigger exercise loading
+app.post('/api/debug/load-exercises', (req, res) => {
+  try {
+    loadExercises();
+    res.json({
+      success: true,
+      exercisesLoaded: exercises.length,
+      sampleExercises: exercises.slice(0, 3)
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error loading exercises',
+      details: error.message
     });
   }
 });

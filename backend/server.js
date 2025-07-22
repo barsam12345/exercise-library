@@ -29,7 +29,27 @@ let exercises = [];
 // Load exercises from Excel file
 function loadExercises() {
   try {
-    const workbook = XLSX.readFile('./uploads/exercise-database.xlsx');
+    // Try to find the Excel file with different possible names
+    const fs = require('fs');
+    const uploadsDir = './uploads/';
+    let excelFile = null;
+    
+    if (fs.existsSync(uploadsDir)) {
+      const files = fs.readdirSync(uploadsDir);
+      const excelFiles = files.filter(f => f.toLowerCase().includes('exercise') && f.toLowerCase().endsWith('.xlsx'));
+      
+      if (excelFiles.length > 0) {
+        excelFile = uploadsDir + excelFiles[0];
+        console.log('Found Excel file:', excelFile);
+      }
+    }
+    
+    if (!excelFile) {
+      console.error('No Excel file found in uploads directory');
+      return;
+    }
+    
+    const workbook = XLSX.readFile(excelFile);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     

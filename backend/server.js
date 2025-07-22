@@ -36,160 +36,60 @@ function loadExercises() {
     console.log('Available sheets:', workbook.SheetNames);
     console.log('Using sheet:', sheetName);
     
-    // Try different parsing approaches
-    let exercisesData = [];
+    // Get raw data to find the correct header row
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    console.log('Total rows in sheet:', rawData.length);
     
-    // Method 1: Try direct JSON conversion (works if headers are in first row)
-    try {
-      exercisesData = XLSX.utils.sheet_to_json(worksheet);
-      console.log('Method 1 - Direct JSON conversion found', exercisesData.length, 'rows');
-      
-      if (exercisesData.length > 0 && (exercisesData[0].Exercise || exercisesData[0]['Exercise'])) {
-        // Success! Headers are in first row
-        exercises = exercisesData.map((row, index) => {
-          const exercise = { id: index + 1 };
-          
-          // Map the data to expected format
-          Object.keys(row).forEach(key => {
-            if (key === 'Video Link') {
-              exercise['Short YouTube Demonstration'] = row[key] || '';
-              exercise['In-Depth YouTube Explanation'] = row[key] || '';
-            } else {
-              exercise[key] = row[key] || '';
-            }
-          });
-          
-          return exercise;
-        });
-        console.log(`Loaded ${exercises.length} exercises using Method 1`);
-        return;
+    // Look for headers in first 20 rows (skip instructions/cover page)
+    let headerRowIndex = -1;
+    for (let rowIndex = 0; rowIndex < Math.min(20, rawData.length); rowIndex++) {
+      const row = rawData[rowIndex];
+      if (row && row.length > 0) {
+        // Check if this row contains exercise headers
+        const exerciseKeywords = ['Exercise', 'exercise', 'Name', 'Difficulty', 'Muscle', 'Equipment', 'Video'];
+        const hasExerciseHeaders = row.some(cell => 
+          cell && exerciseKeywords.some(keyword => 
+            cell.toString().toLowerCase().includes(keyword.toLowerCase())
+          )
+        );
+        
+        if (hasExerciseHeaders) {
+          headerRowIndex = rowIndex;
+          console.log(`Found headers in row ${rowIndex + 1}:`, row);
+          break;
+        }
       }
-    } catch (error) {
-      console.log('Method 1 failed, trying Method 2...');
     }
     
-    // Method 2: Parse with headers option and find header row
-    try {
-      const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      console.log('Method 2 - Raw data has', rawData.length, 'rows');
-      
-      // Find header row by looking for common exercise-related headers
-      let headerRowIndex = -1;
-      const possibleHeaders = ['Exercise', 'exercise', 'EXERCISE', 'Name', 'Exercise Name'];
-      
-      for (let i = 0; i < Math.min(rawData.length, 10); i++) { // Check first 10 rows
-        const row = rawData[i];
-        if (row && row.length > 0) {
-          for (let header of possibleHeaders) {
-            if (row[0] === header || row.some(cell => cell === header)) {
-              headerRowIndex = i;
-              console.log('Found header row at index:', i, 'with headers:', row);
-              break;
-            }
+    if (headerRowIndex === -1) {
+      console.error('Could not find exercise headers in first 20 rows');
+      return;
+    }
+    
+    const headers = rawData[headerRowIndex];
+    const dataRows = rawData.slice(headerRowIndex + 1);
+    
+    console.log('Headers found:', headers);
+    console.log('Data rows to process:', dataRows.length);
+    
+    // Convert to objects with ALL columns
+    exercises = dataRows
+      .filter(row => row && row.length > 0 && row[0] && row[0].toString().trim()) // Filter out empty rows
+      .map((row, index) => {
+        const exercise = { id: index + 1 };
+        headers.forEach((header, i) => {
+          if (header && header.toString().trim()) {
+            exercise[header.toString().trim()] = (row[i] || '').toString().trim();
           }
-          if (headerRowIndex !== -1) break;
-        }
-      }
-      
-      // If no header found, assume first row is headers (common in Excel files)
-      if (headerRowIndex === -1 && rawData.length > 0) {
-        headerRowIndex = 0;
-        console.log('Using first row as headers:', rawData[0]);
-      }
-      
-      if (headerRowIndex === -1) {
-        // Try to use first row as headers if it looks like headers
-        const firstRow = rawData[0];
-        if (firstRow && firstRow.length > 0 && firstRow.some(cell => typeof cell === 'string' && cell.length > 0)) {
-          headerRowIndex = 0;
-          console.log('Using first row as headers:', firstRow);
-        }
-      }
-      
-      if (headerRowIndex === -1) {
-        console.error('Could not find header row. Available data:', rawData.slice(0, 3));
-        return;
-      }
-      
-      const headers = rawData[headerRowIndex];
-      const dataRows = rawData.slice(headerRowIndex + 1);
-      
-      console.log('Headers found:', headers);
-      console.log('Data rows to process:', dataRows.length);
-      
-      // Convert to objects
-      exercises = dataRows
-        .filter(row => row && row.length > 0 && row[0] && row[0].toString().trim()) // Filter out empty rows
-        .map((row, index) => {
-          const exercise = { id: index + 1 };
-          headers.forEach((header, i) => {
-            if (header && header.toString().trim()) {
-              const headerName = header.toString().trim();
-              let value = (row[i] || '').toString().trim();
-              
-              // Map your column names to the expected format
-              if (headerName === 'Video Link') {
-                exercise['Short YouTube Demonstration'] = value;
-                exercise['In-Depth YouTube Explanation'] = value; // Use same link for both
-              } else {
-                exercise[headerName] = value;
-              }
-            }
-          });
-          return exercise;
         });
-      
-      console.log(`Loaded ${exercises.length} exercises using Method 2`);
-      
-      // Log first few exercises for debugging
-      if (exercises.length > 0) {
-        console.log('Sample exercise:', exercises[0]);
-      }
-      
-    } catch (error) {
-      console.error('Method 2 failed:', error);
-    }
+        return exercise;
+      });
     
-    // Method 3: Try to parse with different options
-    if (exercises.length === 0) {
-      try {
-        console.log('Trying Method 3 - Different parsing options...');
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          header: 'A',
-          defval: '',
-          blankrows: false
-        });
-        
-        console.log('Method 3 data sample:', jsonData.slice(0, 2));
-        
-        // Try to find headers in the data
-        const firstRow = jsonData[0];
-        if (firstRow) {
-          const headerKeys = Object.keys(firstRow);
-          const headers = headerKeys.map(key => firstRow[key]).filter(h => h && h.toString().trim());
-          
-          exercises = jsonData.slice(1)
-            .filter(row => Object.values(row).some(val => val && val.toString().trim()))
-            .map((row, index) => {
-              const exercise = { id: index + 1 };
-              headers.forEach((header, i) => {
-                if (header) {
-                  exercise[header] = row[Object.keys(row)[i]] || '';
-                }
-              });
-              return exercise;
-            });
-          
-          console.log(`Loaded ${exercises.length} exercises using Method 3`);
-        }
-      } catch (error) {
-        console.error('Method 3 failed:', error);
-      }
-    }
+    console.log(`Loaded ${exercises.length} exercises with ${headers.length} columns`);
     
-    if (exercises.length === 0) {
-      console.error('Failed to load exercises from Excel file. Please check the file format.');
-      console.log('Available data in worksheet:', XLSX.utils.sheet_to_json(worksheet, { header: 1 }).slice(0, 5));
+    // Log sample exercise for debugging
+    if (exercises.length > 0) {
+      console.log('Sample exercise keys:', Object.keys(exercises[0]));
     }
     
   } catch (error) {
@@ -251,7 +151,12 @@ app.get('/api/exercises', (req, res) => {
     let filteredExercises = [...exercises];
     
     // Apply filters
-    const { difficulty, muscle, equipment, search, page = 1, limit = 20 } = req.query;
+    const { 
+      difficulty, muscle, equipment, search, 
+      posture, bodyRegion, mechanics, forceType, 
+      laterality, classification, movementPattern, 
+      planeOfMotion, page = 1, limit = 20 
+    } = req.query;
     
     if (difficulty) {
       filteredExercises = filteredExercises.filter(ex => 
@@ -268,6 +173,54 @@ app.get('/api/exercises', (req, res) => {
     if (equipment) {
       filteredExercises = filteredExercises.filter(ex => 
         ex['Primary Equipment'] && ex['Primary Equipment'].toLowerCase().includes(equipment.toLowerCase())
+      );
+    }
+    
+    if (posture) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Posture'] && ex['Posture'].toLowerCase().includes(posture.toLowerCase())
+      );
+    }
+    
+    if (bodyRegion) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Body Region'] && ex['Body Region'].toLowerCase().includes(bodyRegion.toLowerCase())
+      );
+    }
+    
+    if (mechanics) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Mechanics'] && ex['Mechanics'].toLowerCase().includes(mechanics.toLowerCase())
+      );
+    }
+    
+    if (forceType) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Force Type'] && ex['Force Type'].toLowerCase().includes(forceType.toLowerCase())
+      );
+    }
+    
+    if (laterality) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Laterality'] && ex['Laterality'].toLowerCase().includes(laterality.toLowerCase())
+      );
+    }
+    
+    if (classification) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Primary Exercise Classification'] && ex['Primary Exercise Classification'].toLowerCase().includes(classification.toLowerCase())
+      );
+    }
+    
+    if (movementPattern) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Movement Pattern #1'] && ex['Movement Pattern #1'].toLowerCase().includes(movementPattern.toLowerCase())
+      );
+    }
+    
+    if (planeOfMotion) {
+      filteredExercises = filteredExercises.filter(ex => 
+        ex['Plane Of Motion #1'] && ex['Plane Of Motion #1'].toLowerCase().includes(planeOfMotion.toLowerCase())
       );
     }
     
@@ -308,11 +261,27 @@ app.get('/api/filters', (req, res) => {
     const difficulties = [...new Set(exercises.map(ex => ex['Difficulty Level']).filter(Boolean))];
     const muscles = [...new Set(exercises.map(ex => ex['Target Muscle Group']).filter(Boolean))];
     const equipment = [...new Set(exercises.map(ex => ex['Primary Equipment']).filter(Boolean))];
+    const postures = [...new Set(exercises.map(ex => ex['Posture']).filter(Boolean))];
+    const bodyRegions = [...new Set(exercises.map(ex => ex['Body Region']).filter(Boolean))];
+    const mechanics = [...new Set(exercises.map(ex => ex['Mechanics']).filter(Boolean))];
+    const forceTypes = [...new Set(exercises.map(ex => ex['Force Type']).filter(Boolean))];
+    const laterality = [...new Set(exercises.map(ex => ex['Laterality']).filter(Boolean))];
+    const classifications = [...new Set(exercises.map(ex => ex['Primary Exercise Classification']).filter(Boolean))];
+    const movementPatterns = [...new Set(exercises.map(ex => ex['Movement Pattern #1']).filter(Boolean))];
+    const planesOfMotion = [...new Set(exercises.map(ex => ex['Plane Of Motion #1']).filter(Boolean))];
     
     res.json({
       difficulties,
       muscles,
-      equipment
+      equipment,
+      postures,
+      bodyRegions,
+      mechanics,
+      forceTypes,
+      laterality,
+      classifications,
+      movementPatterns,
+      planesOfMotion
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });

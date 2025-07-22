@@ -12,7 +12,15 @@ function App() {
   const [selectedFilters, setSelectedFilters] = useState({
     difficulty: '',
     muscle: '',
-    equipment: ''
+    equipment: '',
+    posture: '',
+    bodyRegion: '',
+    mechanics: '',
+    forceType: '',
+    laterality: '',
+    classification: '',
+    movementPattern: '',
+    planeOfMotion: ''
   });
 
   // Load filter options
@@ -133,6 +141,50 @@ function App() {
                 <option key={eq} value={eq}>{eq}</option>
               ))}
             </select>
+
+            <select
+              value={selectedFilters.posture}
+              onChange={(e) => handleFilterChange('posture', e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Postures</option>
+              {filters.postures?.map(posture => (
+                <option key={posture} value={posture}>{posture}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedFilters.bodyRegion}
+              onChange={(e) => handleFilterChange('bodyRegion', e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Body Regions</option>
+              {filters.bodyRegions?.map(region => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedFilters.mechanics}
+              onChange={(e) => handleFilterChange('mechanics', e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Mechanics</option>
+              {filters.mechanics?.map(mech => (
+                <option key={mech} value={mech}>{mech}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedFilters.classification}
+              onChange={(e) => handleFilterChange('classification', e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Classifications</option>
+              {filters.classifications?.map(classification => (
+                <option key={classification} value={classification}>{classification}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -153,10 +205,34 @@ function App() {
                     <strong>Target Muscle:</strong> {exercise['Target Muscle Group']}
                   </div>
                   <div className="detail-row">
+                    <strong>Prime Mover:</strong> {exercise['Prime Mover Muscle']}
+                  </div>
+                  <div className="detail-row">
                     <strong>Equipment:</strong> {exercise['Primary Equipment']}
                   </div>
                   <div className="detail-row">
+                    <strong>Posture:</strong> {exercise['Posture']}
+                  </div>
+                  <div className="detail-row">
                     <strong>Body Region:</strong> {exercise['Body Region']}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Mechanics:</strong> {exercise['Mechanics']}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Force Type:</strong> {exercise['Force Type']}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Laterality:</strong> {exercise['Laterality']}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Classification:</strong> {exercise['Primary Exercise Classification']}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Movement Pattern:</strong> {exercise['Movement Pattern #1']}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Plane of Motion:</strong> {exercise['Plane Of Motion #1']}
                   </div>
                 </div>
 

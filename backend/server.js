@@ -365,11 +365,58 @@ app.get('/api/debug/excel', (req, res) => {
 // Test endpoint to manually trigger exercise loading
 app.post('/api/debug/load-exercises', (req, res) => {
   try {
-    loadExercises();
+    // Use the exact same logic as the working local parser
+    const fs = require('fs');
+    const uploadsDir = './uploads/';
+    let excelFile = null;
+    
+    if (fs.existsSync(uploadsDir)) {
+      const files = fs.readdirSync(uploadsDir);
+      const excelFiles = files.filter(f => f.toLowerCase().includes('exercise') && f.toLowerCase().endsWith('.xlsx'));
+      
+      if (excelFiles.length > 0) {
+        excelFile = uploadsDir + excelFiles[0];
+        console.log('Found Excel file:', excelFile);
+      }
+    }
+    
+    if (!excelFile) {
+      return res.json({
+        success: false,
+        error: 'No Excel file found',
+        availableFiles: fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : []
+      });
+    }
+    
+    const workbook = XLSX.readFile(excelFile);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    // Use row 14 as headers (based on working local parser)
+    const headerRowIndex = 13; // 0-indexed, so row 14 is index 13
+    const headers = rawData[headerRowIndex];
+    const dataRows = rawData.slice(headerRowIndex + 1);
+    
+    exercises = dataRows
+      .filter(row => row && row.length > 0 && row[0] && row[0].toString().trim())
+      .map((row, index) => {
+        const exercise = { id: index + 1 };
+        headers.forEach((header, i) => {
+          if (header && header.toString().trim()) {
+            exercise[header.toString().trim()] = (row[i] || '').toString().trim();
+          }
+        });
+        return exercise;
+      });
+    
     res.json({
       success: true,
       exercisesLoaded: exercises.length,
-      sampleExercises: exercises.slice(0, 3)
+      sampleExercises: exercises.slice(0, 3),
+      headers: headers,
+      totalRows: rawData.length
     });
   } catch (error) {
     res.status(500).json({

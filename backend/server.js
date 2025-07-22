@@ -60,13 +60,13 @@ function loadExercises() {
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
     console.log('Total rows in sheet:', rawData.length);
     
-    // Look for headers in first 20 rows (skip instructions/cover page)
+    // Look for headers in first 50 rows (skip instructions/cover page)
     let headerRowIndex = -1;
-    for (let rowIndex = 0; rowIndex < Math.min(20, rawData.length); rowIndex++) {
+    for (let rowIndex = 0; rowIndex < Math.min(50, rawData.length); rowIndex++) {
       const row = rawData[rowIndex];
       if (row && row.length > 0) {
         // Check if this row contains exercise headers
-        const exerciseKeywords = ['Exercise', 'exercise', 'Name', 'Difficulty', 'Muscle', 'Equipment', 'Video'];
+        const exerciseKeywords = ['Exercise', 'exercise', 'Name', 'Difficulty', 'Muscle', 'Equipment', 'Video', 'Target Muscle Group', 'Primary Equipment'];
         const hasExerciseHeaders = row.some(cell => 
           cell && exerciseKeywords.some(keyword => 
             cell.toString().toLowerCase().includes(keyword.toLowerCase())
@@ -82,8 +82,14 @@ function loadExercises() {
     }
     
     if (headerRowIndex === -1) {
-      console.error('Could not find exercise headers in first 20 rows');
-      return;
+      // Try row 14 as fallback (based on previous testing)
+      if (rawData.length > 14) {
+        headerRowIndex = 13; // 0-indexed, so row 14 is index 13
+        console.log('Using fallback header row 14:', rawData[13]);
+      } else {
+        console.error('Could not find exercise headers in first 50 rows');
+        return;
+      }
     }
     
     const headers = rawData[headerRowIndex];

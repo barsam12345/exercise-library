@@ -362,7 +362,7 @@ app.get('/api/debug/excel', (req, res) => {
   }
 });
 
-// Test endpoint to manually trigger exercise loading
+// Test endpoint to manually trigger exercise loading - FORCE DEPLOYMENT
 app.post('/api/debug/load-exercises', (req, res) => {
   try {
     // Use the exact same logic as the working local parser

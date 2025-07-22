@@ -26,7 +26,7 @@ const upload = multer({ storage: storage });
 // In-memory storage for exercises
 let exercises = [];
 
-// Load exercises from Excel file
+// Load exercises from Excel file - Updated for deployment
 function loadExercises() {
   try {
     // Try to find the Excel file with different possible names

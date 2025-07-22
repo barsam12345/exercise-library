@@ -73,8 +73,8 @@ jspm_packages/
 # TernJS port file
 .tern-port
 
-# Uploads directory
-backend/uploads/
+# Uploads directory (keeping for deployment)
+# backend/uploads/
 
 # IDE files
 .vscode/

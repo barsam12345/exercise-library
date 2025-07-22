@@ -364,4 +364,8 @@ if (process.env.NODE_ENV === 'production') {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Try to load exercises on startup
+  console.log('Attempting to load exercises from Excel file...');
+  loadExercises();
 }); 

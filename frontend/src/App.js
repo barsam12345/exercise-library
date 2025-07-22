@@ -22,6 +22,10 @@ function App() {
     movementPattern: '',
     planeOfMotion: ''
   });
+  
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   // Load filter options
   useEffect(() => {
@@ -89,6 +93,38 @@ function App() {
     );
   };
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    setSelectedFile(file);
+    setUploadStatus('');
+  };
+
+  const uploadFile = async () => {
+    if (!selectedFile) return;
+    
+    setUploadStatus('Uploading...');
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    
+    try {
+      const response = await axios.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      setUploadStatus(`Success! Loaded ${response.data.count} exercises`);
+      setSelectedFile(null);
+      
+      // Reload exercises after upload
+      loadExercises();
+      loadFilters();
+      
+    } catch (error) {
+      setUploadStatus(`Error: ${error.response?.data?.error || error.message}`);
+    }
+  };
+
   return (
     <div className="App">
       <header className="App-header">
@@ -106,6 +142,32 @@ function App() {
               onChange={handleSearch}
               className="search-input"
             />
+          </div>
+          
+          {/* File Upload Section */}
+          <div className="upload-section">
+            <h3>📁 Upload Exercise Database</h3>
+            <p>Upload your Excel file to load exercises:</p>
+            <div className="upload-controls">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileUpload}
+                className="file-input"
+                id="file-upload"
+              />
+              <label htmlFor="file-upload" className="file-label">
+                Choose Excel File
+              </label>
+              <button 
+                onClick={uploadFile}
+                disabled={!selectedFile}
+                className="upload-btn"
+              >
+                {selectedFile ? `Upload ${selectedFile.name}` : 'Upload File'}
+              </button>
+            </div>
+            {uploadStatus && <p className="upload-status">{uploadStatus}</p>}
           </div>
 
           <div className="filters">
